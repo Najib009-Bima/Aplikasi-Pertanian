@@ -10,229 +10,173 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  int userId = 1; 
-  int level = 1;
-  int xp = 0;
-  int xpNeeded = 100;
+  TextEditingController nameCtrl = TextEditingController();
+  TextEditingController emailCtrl = TextEditingController();
+  TextEditingController passCtrl = TextEditingController();
 
-  List<bool> completed = [false, false, false];
+  bool isLoading = false;
 
-  final List<Map<String, dynamic>> quests = [
-    {"id": 1, "title": "Cek Lahan Hari Ini", "desc": "Isi kondisi lahan", "xp": 10, "type": "Harian"},
-    {"id": 2, "title": "Input Data Panen", "desc": "Laporkan hasil panen", "xp": 5, "type": "Harian"},
-    {"id": 3, "title": "Laporan Pertumbuhan Mingguan", "desc": "Laporkan pertumbuhan tanaman", "xp": 30, "type": "Mingguan"},
-  ];
+  Future<void> register() async {
+    setState(() => isLoading = true);
 
-  // ============================================
-  // LOAD DATA USER + QUEST PROGRESS
-  // ============================================
-  Future<void> loadUserData() async {
-    try {
-      final url = Uri.parse("http://10.121.167.10/api/get_user_data.php?user_id=$userId");
-      final response = await http.get(url);
+    final url = Uri.parse("http://localhost/api/register.php");
 
-      if (response.statusCode != 200) return;
+    var response = await http.post(url, body: {
+      "name": nameCtrl.text,
+      "email": emailCtrl.text,
+      "password": passCtrl.text,
+    });
 
-      final data = jsonDecode(response.body);
+    var data = json.decode(response.body);
+    setState(() => isLoading = false);
 
-      if (data["success"] == true) {
-        setState(() {
-          xp = int.parse(data["user"]["xp"]);
-          level = int.parse(data["user"]["level"]);
-          xpNeeded = int.parse(data["user"]["xp_needed"]);
+    if (data["success"]) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Registrasi berhasil!")),
+      );
 
-          for (int i = 0; i < quests.length; i++) {
-            int qid = quests[i]["id"];
-            completed[i] = data["progress"][qid.toString()] == 1;
-          }
-        });
-      }
-    } catch (e) {
-      print("Error loadUserData: $e");
+      Navigator.pushReplacementNamed(context, "/");
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(data["message"])),
+      );
     }
-  }
-
-  // ============================================
-  // UPDATE QUEST + XP USER
-  // ============================================
-  Future<void> updateQuest(int questIndex) async {
-    int questId = quests[questIndex]["id"];
-    int xpReward = quests[questIndex]["xp"];
-
-    try {
-      final url = Uri.parse("http://10.121.167.10/api/update_quest.php");
-
-      final response = await http.post(url, body: {
-        "user_id": userId.toString(),
-        "quest_id": questId.toString(),
-        "xp_reward": xpReward.toString(),
-      });
-
-      if (response.statusCode != 200) return;
-
-      final data = jsonDecode(response.body);
-
-      if (data["success"] == true) {
-        setState(() {
-          xp = data["new_xp"];
-          level = data["new_level"];
-          xpNeeded = data["next_xp_needed"];
-          completed[questIndex] = true;
-        });
-      }
-    } catch (e) {
-      print("Error updateQuest: $e");
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    loadUserData();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green.shade50,
-      appBar: AppBar(
-        title: const Text("Quest Pertanian"),
-        backgroundColor: Colors.green,
-      ),
-
-      body: Column(
-        children: [
-          // =================== PLAYER STATUS ====================
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            color: Colors.green.shade200,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text("Level $level",
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text("XP: $xp / $xpNeeded",
-                    style: const TextStyle(fontSize: 16)),
-                const SizedBox(height: 6),
-
-                LinearProgressIndicator(
-                  value: xpNeeded > 0 ? xp / xpNeeded : 0,
-                  minHeight: 10,
-                  backgroundColor: Colors.white,
-                  color: Colors.green.shade800,
+      backgroundColor: Colors.white, // background tetap putih
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 50),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.agriculture,
+                      color: Colors.green[700],
+                      size: 80,
+                    ),
+                    const SizedBox(height: 15),
+                    Text(
+                      "Registrasi PanenX",
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[800],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                  ],
                 ),
-              ],
-            ),
-          ),
-
-          // ==================== QUEST LIST ======================
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: quests.length,
-              itemBuilder: (context, index) {
-                final quest = quests[index];
-
-                return Card(
-                  elevation: 3,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade100,
+              ),
+              Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: "Nama Lengkap",
+                          labelStyle: TextStyle(color: Colors.green[700]),
+                          border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.eco,
-                              color: Colors.green, size: 30),
-                        ),
-                        const SizedBox(width: 16),
-
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(quest["title"],
-                                  style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 6),
-
-                              Text(
-                                quest["desc"],
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey.shade700),
-                              ),
-                              const SizedBox(height: 10),
-
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text("+${quest["xp"]} XP",
-                                      style: const TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.bold)),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        vertical: 4, horizontal: 12),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade200,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(quest["type"],
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold)),
-                                  )
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-
-                              // ================= BUTTON FIXED ==================
-                              ElevatedButton(
-                                onPressed: completed[index]
-                                    ? null
-                                    : () => updateQuest(index),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: completed[index]
-                                      ? Colors.grey
-                                      : Colors.green,
-                                  minimumSize:
-                                      const Size(double.infinity, 40),
-                                ),
-                                child: Text(
-                                  completed[index]
-                                      ? "Completed"
-                                      : "Accept Quest",
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 16),
-                                ),
-                              ),
-                            ],
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: Colors.green.shade700, width: 2),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextField(
+                        controller: emailCtrl,
+                        decoration: InputDecoration(
+                          labelText: "Email",
+                          labelStyle: TextStyle(color: Colors.green[700]),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: Colors.green.shade700, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextField(
+                        controller: passCtrl,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: "Password",
+                          labelStyle: TextStyle(color: Colors.green[700]),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: Colors.green.shade700, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: isLoading ? null : register,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green[700],
+                            padding: const EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 3,
+                                  ),
+                                )
+                              : const Text(
+                                  "Daftar",
+                                  style: TextStyle(fontSize: 16),
+                                ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pushReplacementNamed(context, "/");
+                        },
+                        child: Text(
+                          "Sudah punya akun? Login",
+                          style: TextStyle(color: Colors.green[700]),
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
+
